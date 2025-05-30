@@ -16,5 +16,8 @@
     "48": "vite.svg",
     "128": "vite.svg"
   },
-  "permissions": []
+  "permissions": ["contextMenus", "storage"],
+  "background": {
+    "service_worker": "background.js"
+  }
 }

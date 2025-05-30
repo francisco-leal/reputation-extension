@@ -1,51 +1,32 @@
 import { useState, useEffect } from "react";
 
 function App() {
-  const [name, setName] = useState<string | null>(null);
-  const [input, setInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("name");
-    if (stored) setName(stored);
-  }, []);
+    const stored = window.localStorage.getItem("searchTerm");
+    if (stored) setSearchTerm(stored);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (input.trim()) {
-      window.localStorage.setItem("name", input.trim());
-      setName(input.trim());
-    }
-  };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "searchTerm") {
+        setSearchTerm(e.newValue);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   return (
     <div className="min-w-[300px] min-h-[120px] flex flex-col items-center justify-center p-4 bg-white rounded shadow">
       <h1 className="text-xl font-bold mb-4 text-center">
         Web3 Reputation Explorer
       </h1>
-      {name ? (
+      {searchTerm ? (
         <p className="text-lg">
-          Hello, <b>{name}</b>!
+          Search term: <b>{searchTerm}</b>
         </p>
       ) : (
-        <form
-          onSubmit={handleSubmit}
-          className="flex gap-2 w-full justify-center"
-        >
-          <input
-            type="text"
-            placeholder="Enter your name"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400 flex-1"
-            autoFocus
-          />
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
-          >
-            Save
-          </button>
-        </form>
+        <p className="text-gray-500">No search term selected yet.</p>
       )}
     </div>
   );
