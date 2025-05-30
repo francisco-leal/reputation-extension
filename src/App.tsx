@@ -19,18 +19,20 @@ import { Button } from "@/components/ui/button";
 
 function Home() {
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
+  const [pageUrl, setPageUrl] = useState<string | null>(null);
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("searchTerm");
-    if (stored) setSearchTerm(stored);
+    const storedTerm = window.localStorage.getItem("searchTerm");
+    if (storedTerm) setSearchTerm(storedTerm);
+    const storedUrl = window.localStorage.getItem("pageUrl");
+    if (storedUrl) setPageUrl(storedUrl);
 
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "searchTerm") {
-        setSearchTerm(e.newValue);
-      }
+      if (e.key === "searchTerm") setSearchTerm(e.newValue);
+      if (e.key === "pageUrl") setPageUrl(e.newValue);
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -70,6 +72,11 @@ function Home() {
             Search term:{" "}
             <b className="text-primary">{displaySearchTerm(searchTerm)}</b>
           </p>
+          {pageUrl && (
+            <p className="text-xs text-muted-foreground font-mono mb-2 text-center break-all">
+              Page URL: <span className="text-primary">{pageUrl}</span>
+            </p>
+          )}
           <Button
             className="font-mono mb-2"
             onClick={handleSearchScore}

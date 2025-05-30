@@ -9,16 +9,30 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info: any, _tab: any) => {
+chrome.contextMenus.onClicked.addListener((info: any, tab: any) => {
   if (info.menuItemId === "search-reputation" && info.selectionText) {
-    chrome.storage.local.set({ searchTerm: info.selectionText }, () => {
-      chrome.runtime.sendMessage({
-        type: "SEARCH_TERM_UPDATED",
-        searchTerm: info.selectionText,
-      });
+    const context = {
+      searchTerm: info.selectionText,
+      pageUrl: info.pageUrl || (tab && tab.url) || "",
+    };
+    chrome.storage.local.set(context, () => {
+      chrome.runtime.sendMessage(
+        {
+          type: "CONTEXT_UPDATED",
+          searchTerm: context.searchTerm,
+          pageUrl: context.pageUrl,
+        },
+        () => {
+          if (chrome.runtime.lastError) {
+            // No receiving end, ignore error
+          }
+        }
+      );
     });
     const url = chrome.runtime.getURL(
-      `index.html?search=${encodeURIComponent(info.selectionText)}`
+      `index.html?search=${encodeURIComponent(
+        info.selectionText
+      )}&url=${encodeURIComponent(context.pageUrl)}`
     );
     chrome.windows.create({
       url,
