@@ -15,7 +15,7 @@ import {
   NavigationMenuItem,
   NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
-import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 function Home() {
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
@@ -23,6 +23,8 @@ function Home() {
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [showResult, setShowResult] = useState(false);
 
   useEffect(() => {
     const storedTerm = window.localStorage.getItem("searchTerm");
@@ -38,6 +40,14 @@ function Home() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  // Automatically fetch score when searchTerm is set
+  useEffect(() => {
+    if (searchTerm) {
+      handleSearchScore();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
   function displaySearchTerm(term: string) {
     if (term.length > 20) {
       return `${term.slice(0, 6)}...${term.slice(-6)}`;
@@ -50,6 +60,8 @@ function Home() {
     setLoading(true);
     setError(null);
     setScore(null);
+    setShowResult(false);
+    setProgress(0);
     try {
       const { fetchTalentScore } = await import("@/lib/talentApi");
       const result = await fetchTalentScore(searchTerm);
@@ -57,9 +69,24 @@ function Home() {
     } catch (err: any) {
       setError(err.message || "Unknown error");
     } finally {
-      setLoading(false);
+      setProgress(100);
+      setTimeout(() => {
+        setLoading(false);
+        setShowResult(true);
+      }, 300);
     }
   };
+
+  // Progress bar animation
+  useEffect(() => {
+    let timer: any;
+    if (loading && progress < 96) {
+      timer = setTimeout(() => {
+        setProgress((prev) => (prev < 90 ? prev + 10 : 96));
+      }, 300);
+    }
+    return () => clearTimeout(timer);
+  }, [loading, progress]);
 
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-background flex flex-col items-center">
@@ -77,21 +104,17 @@ function Home() {
               Page URL: <span className="text-primary">{pageUrl}</span>
             </p>
           )}
-          <Button
-            className="font-mono mb-2"
-            onClick={handleSearchScore}
-            disabled={loading}
-          >
-            {loading ? "Searching..." : "Get Builder Score"}
-          </Button>
+          {loading && <Progress value={progress} />}
         </>
       ) : (
         <p className="text-muted-foreground font-mono mb-2 text-center">
           No search term selected yet.
         </p>
       )}
-      {error && <p className="text-red-500 font-mono mt-2">{error}</p>}
-      {score !== null && !loading && !error && (
+      {error && showResult && (
+        <p className="text-red-500 font-mono mt-2">{error}</p>
+      )}
+      {score !== null && showResult && !loading && !error && (
         <p className="text-lg font-mono mt-2">
           Builder Score: <b>{score}</b>
         </p>
