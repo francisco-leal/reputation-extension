@@ -9,6 +9,14 @@ import {
 } from "@tanstack/react-router";
 import Admin from "./Admin";
 import { createHashHistory } from "@tanstack/history";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  NavigationMenu,
+  NavigationMenuList,
+  NavigationMenuItem,
+  NavigationMenuLink,
+} from "@/components/ui/navigation-menu";
 
 function Home() {
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
@@ -27,48 +35,63 @@ function Home() {
   }, []);
 
   return (
-    <div className="min-w-[340px] min-h-[160px] flex flex-col items-center justify-center p-8 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 rounded-2xl shadow-2xl border border-gray-700 max-w-md mx-auto">
-      <h1 className="text-2xl font-extrabold mb-4 text-center text-white font-mono tracking-tight drop-shadow-lg">
-        Web3 Reputation Explorer
-      </h1>
-      {searchTerm ? (
-        <p className="text-lg text-gray-200 font-mono mb-2">
-          Search term: <b className="text-blue-400">{searchTerm}</b>
-        </p>
-      ) : (
-        <p className="text-gray-400 font-mono mb-2">
-          No search term selected yet.
-        </p>
-      )}
-      <Link
-        to="/admin"
-        className="mt-6 px-5 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white font-semibold font-mono shadow transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400"
-      >
-        Go to Admin
-      </Link>
-    </div>
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>
+          <h1 className="text-2xl font-extrabold text-center font-mono tracking-tight drop-shadow-lg">
+            Web3 Reputation Explorer
+          </h1>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {searchTerm ? (
+          <p className="text-lg text-muted-foreground font-mono mb-2 text-center">
+            Search term: <b className="text-primary">{searchTerm}</b>
+          </p>
+        ) : (
+          <p className="text-muted-foreground font-mono mb-2 text-center">
+            No search term selected yet.
+          </p>
+        )}
+        <div className="flex justify-center mt-6">
+          <Button asChild>
+            <Link to="/admin">Go to Admin</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
 function Root() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 flex flex-col items-center justify-start py-12 px-2">
-      <nav className="mb-8 flex gap-4 bg-gray-800 rounded-full px-6 py-2 shadow-lg border border-gray-700">
-        <Link
-          to="/"
-          className="px-4 py-1 rounded-full text-sm font-mono font-semibold text-gray-200 hover:bg-gray-700 hover:text-blue-400 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400"
-        >
-          Home
-        </Link>
-        <Link
-          to="/admin"
-          className="px-4 py-1 rounded-full text-sm font-mono font-semibold text-gray-200 hover:bg-gray-700 hover:text-blue-400 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400"
-        >
-          Admin
-        </Link>
-      </nav>
+    <>
+      <NavigationMenu className="mb-8">
+        <NavigationMenuList>
+          <NavigationMenuItem>
+            <NavigationMenuLink asChild>
+              <Link
+                to="/"
+                className="px-4 py-1 rounded-full text-sm font-mono font-semibold"
+              >
+                Home
+              </Link>
+            </NavigationMenuLink>
+          </NavigationMenuItem>
+          <NavigationMenuItem>
+            <NavigationMenuLink asChild>
+              <Link
+                to="/admin"
+                className="px-4 py-1 rounded-full text-sm font-mono font-semibold"
+              >
+                Admin
+              </Link>
+            </NavigationMenuLink>
+          </NavigationMenuItem>
+        </NavigationMenuList>
+      </NavigationMenu>
       <Outlet />
-    </div>
+    </>
   );
 }
 
@@ -96,7 +119,7 @@ const notFoundRoute = createRoute({
     window.location.hash = "#/";
     window.location.pathname = "/";
     return (
-      <div className="p-4 text-center text-gray-500">
+      <div className="p-4 text-center text-muted-foreground">
         Redirecting to home...
       </div>
     );
