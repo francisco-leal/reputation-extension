@@ -15,9 +15,13 @@ import {
   NavigationMenuItem,
   NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
+import { Button } from "@/components/ui/button";
 
 function Home() {
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
+  const [score, setScore] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("searchTerm");
@@ -32,18 +36,57 @@ function Home() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  function displaySearchTerm(term: string) {
+    if (term.length > 20) {
+      return `${term.slice(0, 6)}...${term.slice(-6)}`;
+    }
+    return term;
+  }
+
+  const handleSearchScore = async () => {
+    if (!searchTerm) return;
+    setLoading(true);
+    setError(null);
+    setScore(null);
+    try {
+      const { fetchTalentScore } = await import("@/lib/talentApi");
+      const result = await fetchTalentScore(searchTerm);
+      setScore(result);
+    } catch (err: any) {
+      setError(err.message || "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-background flex flex-col items-center">
       <h1 className="text-2xl font-extrabold text-center font-mono tracking-tight mb-4">
         Web3 Reputation Explorer
       </h1>
       {searchTerm ? (
-        <p className="text-lg text-muted-foreground font-mono mb-2 text-center">
-          Search term: <b className="text-primary">{searchTerm}</b>
-        </p>
+        <>
+          <p className="text-lg text-muted-foreground font-mono mb-2 text-center">
+            Search term:{" "}
+            <b className="text-primary">{displaySearchTerm(searchTerm)}</b>
+          </p>
+          <Button
+            className="font-mono mb-2"
+            onClick={handleSearchScore}
+            disabled={loading}
+          >
+            {loading ? "Searching..." : "Get Builder Score"}
+          </Button>
+        </>
       ) : (
         <p className="text-muted-foreground font-mono mb-2 text-center">
           No search term selected yet.
+        </p>
+      )}
+      {error && <p className="text-red-500 font-mono mt-2">{error}</p>}
+      {score !== null && !loading && !error && (
+        <p className="text-lg font-mono mt-2">
+          Builder Score: <b>{score}</b>
         </p>
       )}
     </div>
