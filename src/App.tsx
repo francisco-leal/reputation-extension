@@ -9,8 +9,6 @@ import {
 } from "@tanstack/react-router";
 import Admin from "./Admin";
 import { createHashHistory } from "@tanstack/history";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -35,31 +33,20 @@ function Home() {
   }, []);
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>
-          <h1 className="text-2xl font-extrabold text-center font-mono tracking-tight drop-shadow-lg">
-            Web3 Reputation Explorer
-          </h1>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {searchTerm ? (
-          <p className="text-lg text-muted-foreground font-mono mb-2 text-center">
-            Search term: <b className="text-primary">{searchTerm}</b>
-          </p>
-        ) : (
-          <p className="text-muted-foreground font-mono mb-2 text-center">
-            No search term selected yet.
-          </p>
-        )}
-        <div className="flex justify-center mt-6">
-          <Button asChild>
-            <Link to="/admin">Go to Admin</Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="w-full max-w-md mx-auto p-6 bg-background flex flex-col items-center">
+      <h1 className="text-2xl font-extrabold text-center font-mono tracking-tight mb-4">
+        Web3 Reputation Explorer
+      </h1>
+      {searchTerm ? (
+        <p className="text-lg text-muted-foreground font-mono mb-2 text-center">
+          Search term: <b className="text-primary">{searchTerm}</b>
+        </p>
+      ) : (
+        <p className="text-muted-foreground font-mono mb-2 text-center">
+          No search term selected yet.
+        </p>
+      )}
+    </div>
   );
 }
 
