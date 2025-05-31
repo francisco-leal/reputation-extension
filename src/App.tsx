@@ -20,51 +20,156 @@ import { fetchBlockscoutAddressInfo } from "@/lib/blockscoutApi";
 import { fetchTalentScore } from "@/lib/talentApi";
 import { parseUnits, formatEther } from "viem";
 
+// Add BlockscoutData type
+type BlockscoutData = {
+  is_contract: boolean;
+  is_verified: boolean;
+  coin_balance: string;
+  name: string | null;
+  creator_address_hash: string | null;
+};
+
 function Home() {
-  const [searchTerm, setSearchTerm] = useState<string | null>(null);
-  const [pageUrl, setPageUrl] = useState<string | null>(null);
-  const [score, setScore] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // State machine states: idle, loadingBlockscout, loadingTalent, done, error
+  type State =
+    | { status: "idle"; searchTerm: string; pageUrl: string }
+    | {
+        status: "loadingBlockscout";
+        searchTerm: string;
+        pageUrl: string;
+        progress: number;
+      }
+    | {
+        status: "loadingTalent";
+        searchTerm: string;
+        pageUrl: string;
+        blockscoutData: BlockscoutData;
+        progress: number;
+      }
+    | {
+        status: "done";
+        searchTerm: string;
+        pageUrl: string;
+        blockscoutData: BlockscoutData;
+        score: number | null;
+        progress: number;
+      }
+    | { status: "error"; error: string; progress: number };
+
+  const [state, setState] = useState<State>({
+    status: "idle",
+    searchTerm: "",
+    pageUrl: "",
+  });
+  const [input, setInput] = useState("");
   const [progress, setProgress] = useState(0);
-  const [showResult, setShowResult] = useState(false);
-  const [blockscoutData, setBlockscoutData] = useState<{
-    is_contract: boolean;
-    is_verified: boolean;
-    coin_balance: string;
-    name: string | null;
-    creator_address_hash: string | null;
-  } | null>(null);
-  const [blockscoutError, setBlockscoutError] = useState<string | null>(null);
-  const [blockscoutLoading, setBlockscoutLoading] = useState(false);
 
+  // Load from localStorage on mount
   useEffect(() => {
-    const storedTerm = window.localStorage.getItem("searchTerm");
+    const urlParams = new URLSearchParams(window.location.search);
+    const storedTerm = urlParams.get("search");
+    const storedUrl = urlParams.get("url");
     if (storedTerm) {
-      setSearchTerm(storedTerm);
-      window.localStorage.removeItem("searchTerm");
+      setState({
+        status: "loadingBlockscout",
+        searchTerm: storedTerm,
+        pageUrl: storedUrl || "",
+        progress: 0,
+      });
     }
-    const storedUrl = window.localStorage.getItem("pageUrl");
-    if (storedUrl) {
-      setPageUrl(storedUrl);
-      window.localStorage.removeItem("pageUrl");
-    }
-
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "searchTerm") setSearchTerm(e.newValue);
-      if (e.key === "pageUrl") setPageUrl(e.newValue);
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Automatically fetch score and blockscout data when searchTerm is set
+  // Progress bar animation
   useEffect(() => {
-    if (searchTerm) {
-      handleSearchData();
+    if (
+      state.status === "loadingBlockscout" ||
+      state.status === "loadingTalent"
+    ) {
+      if (progress < 96) {
+        const timer = setTimeout(() => {
+          setProgress((prev) => (prev < 90 ? prev + 10 : 96));
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      setProgress(0);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, [state.status, progress]);
+
+  // Handle state transitions
+  useEffect(() => {
+    if (state.status === "loadingBlockscout") {
+      setProgress(10);
+      fetchBlockscoutAddressInfo(state.searchTerm)
+        .then((blockscoutData) => {
+          setProgress(70);
+          if (!blockscoutData) {
+            setState({
+              status: "error",
+              error: "Blockscout returned null data",
+              progress: 100,
+            });
+            return;
+          }
+          if (!blockscoutData.is_contract) {
+            setState({
+              status: "loadingTalent",
+              searchTerm: state.searchTerm,
+              pageUrl: state.pageUrl,
+              blockscoutData: blockscoutData,
+              progress: 70,
+            });
+          } else {
+            setState({
+              status: "done",
+              searchTerm: state.searchTerm,
+              pageUrl: state.pageUrl,
+              blockscoutData: blockscoutData,
+              score: null,
+              progress: 100,
+            });
+          }
+        })
+        .catch((err: any) => {
+          setState({
+            status: "error",
+            error: err.message || "Blockscout error",
+            progress: 100,
+          });
+        });
+    } else if (state.status === "loadingTalent") {
+      setProgress(80);
+      fetchTalentScore(state.searchTerm)
+        .then((score) => {
+          setProgress(100);
+          setState({
+            status: "done",
+            searchTerm: state.searchTerm,
+            pageUrl: state.pageUrl,
+            blockscoutData: state.blockscoutData,
+            score,
+            progress: 100,
+          });
+        })
+        .catch((err: any) => {
+          setState({
+            status: "error",
+            error: err.message || "Talent Protocol error",
+            progress: 100,
+          });
+        });
+    }
+  }, [state.status]);
+
+  // Clean up localStorage and reset state when popup is closed
+  useEffect(() => {
+    const cleanup = () => {
+      setState({ status: "idle", searchTerm: "", pageUrl: "" });
+      setInput("");
+    };
+    window.addEventListener("unload", cleanup);
+    return () => window.removeEventListener("unload", cleanup);
+  }, []);
 
   function displaySearchTerm(term: string) {
     if (term.length > 20) {
@@ -73,123 +178,119 @@ function Home() {
     return term;
   }
 
-  const handleSearchData = async () => {
-    if (!searchTerm) return;
-    setLoading(true);
-    setBlockscoutLoading(true);
-    setError(null);
-    setBlockscoutError(null);
-    setScore(null);
-    setBlockscoutData(null);
-    setShowResult(false);
-    setProgress(0);
-    try {
-      const [talentResult, blockscoutResult] = await Promise.all([
-        fetchTalentScore(searchTerm),
-        fetchBlockscoutAddressInfo(searchTerm),
-      ]);
-      setScore(talentResult);
-      setBlockscoutData(blockscoutResult);
-    } catch (err: any) {
-      if (err.message?.includes("Talent")) {
-        setError(err.message || "Unknown error");
-      } else {
-        setBlockscoutError(err.message || "Unknown error");
-      }
-    } finally {
-      setProgress(100);
-      setTimeout(() => {
-        setLoading(false);
-        setBlockscoutLoading(false);
-        setShowResult(true);
-      }, 300);
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    setState({
+      status: "loadingBlockscout",
+      searchTerm: input.trim(),
+      pageUrl: "",
+      progress: 0,
+    });
   };
 
-  // Progress bar animation
-  useEffect(() => {
-    let timer: any;
-    if (loading && progress < 96) {
-      timer = setTimeout(() => {
-        setProgress((prev) => (prev < 90 ? prev + 10 : 96));
-      }, 300);
-    }
-    return () => clearTimeout(timer);
-  }, [loading, progress]);
-
+  // UI rendering per state
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-background flex flex-col items-center">
       <h1 className="text-2xl font-extrabold text-center font-mono tracking-tight mb-4">
         Web3 Reputation Explorer
       </h1>
-      {searchTerm ? (
+      {state.status === "idle" && (
+        <form
+          onSubmit={handleSubmit}
+          className="w-full flex flex-col items-center gap-2"
+        >
+          <input
+            className="w-full border rounded px-3 py-2 font-mono"
+            placeholder="Enter address or ENS..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            autoFocus
+          />
+          <button
+            type="submit"
+            className="px-4 py-1 rounded-full text-sm font-mono font-semibold bg-primary text-white"
+          >
+            Search
+          </button>
+        </form>
+      )}
+      {(state.status === "loadingBlockscout" ||
+        state.status === "loadingTalent" ||
+        state.status === "done" ||
+        state.status === "error") && (
         <>
           <p className="text-lg text-muted-foreground font-mono mb-2 text-center">
             Search term:{" "}
-            <b className="text-primary">{displaySearchTerm(searchTerm)}</b>
+            <b className="text-primary">
+              {state.status !== "error"
+                ? displaySearchTerm(state.searchTerm)
+                : "-"}
+            </b>
           </p>
-          {pageUrl && (
+          {state.status !== "error" && state.pageUrl && (
             <p className="text-xs text-muted-foreground font-mono mb-2 text-center break-all">
-              Page URL: <span className="text-primary">{pageUrl}</span>
+              Page URL: <span className="text-primary">{state.pageUrl}</span>
             </p>
           )}
-          {loading || blockscoutLoading ? <Progress value={progress} /> : null}
+          {(state.status === "loadingBlockscout" ||
+            state.status === "loadingTalent") && <Progress value={progress} />}
         </>
-      ) : (
-        <p className="text-muted-foreground font-mono mb-2 text-center">
-          No search term selected yet.
-        </p>
       )}
-      {error && showResult && (
-        <p className="text-red-500 font-mono mt-2">{error}</p>
+      {state.status === "error" && (
+        <p className="text-red-500 font-mono mt-2">{state.error}</p>
       )}
-      {blockscoutError !== null && showResult && (
-        <p className="text-red-500 font-mono mt-2">
-          Blockscout: {blockscoutError}
-        </p>
-      )}
-      {score !== null && showResult && !loading && !error && (
-        <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
-          <div className="font-bold text-lg text-center">Talent Protocol</div>
-          <div>
-            Builder Score: <b>{score}</b>
-          </div>
-        </div>
-      )}
-      {blockscoutData &&
-        showResult &&
-        !blockscoutLoading &&
-        !blockscoutError && (
+      {state.status === "done" && (
+        <>
           <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
             <div className="font-bold text-lg text-center">Blockscout</div>
-            {blockscoutData.name && (
+            {state.blockscoutData.name && (
               <div>
-                Name: <b>{blockscoutData.name || "-"}</b>
+                Name: <b>{state.blockscoutData.name || "-"}</b>
               </div>
             )}
             <div>
               ETH Balance:{" "}
               <b>
-                {Number(
-                  formatEther(parseUnits(blockscoutData.coin_balance, 0))
-                ).toFixed(2)}{" "}
+                {typeof state.blockscoutData.coin_balance === "string"
+                  ? Number(
+                      formatEther(
+                        parseUnits(state.blockscoutData.coin_balance, 0)
+                      )
+                    ).toFixed(2)
+                  : "-"}{" "}
                 ETH
               </b>
             </div>
             <div>
-              Is Contract: <b>{blockscoutData.is_contract ? "Yes" : "No"}</b>
+              Is Contract:{" "}
+              <b>{state.blockscoutData.is_contract ? "Yes" : "No"}</b>
             </div>
-            {blockscoutData.creator_address_hash && (
+            {state.blockscoutData.creator_address_hash && (
               <div>
                 Creator:{" "}
-                <b>{displaySearchTerm(blockscoutData.creator_address_hash)}</b>
+                <b>
+                  {displaySearchTerm(state.blockscoutData.creator_address_hash)}
+                </b>
               </div>
             )}
             <div>
-              Is Verified: <b>{blockscoutData.is_verified ? "Yes" : "No"}</b>
+              Is Verified:{" "}
+              <b>{state.blockscoutData.is_verified ? "Yes" : "No"}</b>
             </div>
           </div>
-        )}
+          {state.score !== null && (
+            <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
+              <div className="font-bold text-lg text-center">
+                Talent Protocol
+              </div>
+              <div>
+                Builder Score: <b>{state.score}</b>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
