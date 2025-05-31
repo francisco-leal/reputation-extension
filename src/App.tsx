@@ -20,6 +20,7 @@ import { fetchBlockscoutAddressInfo } from "@/lib/blockscoutApi";
 import { fetchTalentScore } from "@/lib/talentApi";
 import { parseUnits, formatEther } from "viem";
 import { fetchDuneBalances } from "@/lib/duneApi";
+import { fetchFarcasterUser, type FarcasterUser } from "@/lib/farcasterApi";
 
 // Add BlockscoutData type
 type BlockscoutData = {
@@ -98,6 +99,13 @@ function Home() {
   const [input, setInput] = useState("");
   const [progress, setProgress] = useState(0);
 
+  // Add Farcaster user state
+  const [farcasterUser, setFarcasterUser] = useState<FarcasterUser | null>(
+    null
+  );
+  const [farcasterLoading, setFarcasterLoading] = useState(false);
+  const [farcasterError, setFarcasterError] = useState<string | null>(null);
+
   // Load from localStorage on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -131,6 +139,37 @@ function Home() {
       setProgress(0);
     }
   }, [state.status, progress]);
+
+  // Farcaster integration: fetch user if pageUrl contains farcaster.xyz
+  useEffect(() => {
+    setFarcasterUser(null);
+    setFarcasterError(null);
+    setFarcasterLoading(false);
+    console.log("test");
+    if (
+      "pageUrl" in state &&
+      typeof state.pageUrl === "string" &&
+      state.pageUrl.includes("farcaster.xyz")
+    ) {
+      // Extract username: farcaster.xyz/USERNAME/
+      const match = state.pageUrl.match(/farcaster\.xyz\/([^/]+)\//);
+      const username = match && match[1] ? match[1] : null;
+      console.log("username", username);
+      console.log("state.pageUrl", state.pageUrl);
+      if (username) {
+        setFarcasterLoading(true);
+        fetchFarcasterUser(username)
+          .then((user) => {
+            setFarcasterUser(user);
+            setFarcasterLoading(false);
+          })
+          .catch((err) => {
+            setFarcasterError(err.message || "Farcaster error");
+            setFarcasterLoading(false);
+          });
+      }
+    }
+  }, [state]);
 
   // Handle state transitions
   useEffect(() => {
@@ -382,6 +421,34 @@ function Home() {
               </div>
             </div>
           )}
+          {/* Farcaster UI */}
+          {"pageUrl" in state &&
+            typeof state.pageUrl === "string" &&
+            state.pageUrl.includes("farcaster.xyz") && (
+              <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
+                <div className="font-bold text-lg text-center">Farcaster</div>
+                {farcasterLoading && <div>Loading Farcaster user...</div>}
+                {farcasterError && (
+                  <div className="text-red-500">{farcasterError}</div>
+                )}
+                {farcasterUser && (
+                  <div className="flex flex-col items-center gap-2">
+                    <img
+                      src={farcasterUser.pfp_url}
+                      alt="Profile"
+                      className="w-12 h-12 rounded-full border"
+                    />
+                    <div>
+                      <b>
+                        {farcasterUser.display_name || farcasterUser.username}
+                      </b>
+                    </div>
+                    <div>FID: {farcasterUser.fid}</div>
+                    <div>Followers: {farcasterUser.follower_count}</div>
+                  </div>
+                )}
+              </div>
+            )}
         </>
       )}
     </div>
