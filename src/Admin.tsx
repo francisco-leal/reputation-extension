@@ -7,6 +7,7 @@ const API_KEYS = [
   { id: "talentProtocol", label: "Talent Protocol" },
   { id: "farcaster", label: "Farcaster" },
   { id: "blockscout", label: "Blockscout" },
+  { id: "dune", label: "Dune" },
 ];
 
 type ApiKeys = {

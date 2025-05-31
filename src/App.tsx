@@ -19,6 +19,7 @@ import { Progress } from "@/components/ui/progress";
 import { fetchBlockscoutAddressInfo } from "@/lib/blockscoutApi";
 import { fetchTalentScore } from "@/lib/talentApi";
 import { parseUnits, formatEther } from "viem";
+import { fetchDuneBalances } from "@/lib/duneApi";
 
 // Add BlockscoutData type
 type BlockscoutData = {
@@ -29,14 +30,45 @@ type BlockscoutData = {
   creator_address_hash: string | null;
 };
 
+// Add Dune types
+type DuneBalance = {
+  chain: string;
+  chain_id: number;
+  address: string;
+  amount: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  price_usd: number;
+  value_usd: number;
+  pool_size: number;
+  low_liquidity: boolean;
+};
+
+type DuneData = {
+  request_time: string;
+  response_time: string;
+  wallet_address: string;
+  balances: DuneBalance[];
+};
+
+const MINIMUM_BALANCE_USD = 50;
+
 function Home() {
-  // State machine states: idle, loadingBlockscout, loadingTalent, done, error
+  // State machine states: idle, loadingDune, loadingBlockscout, loadingTalent, done, error
   type State =
     | { status: "idle"; searchTerm: string; pageUrl: string }
+    | {
+        status: "loadingDune";
+        searchTerm: string;
+        pageUrl: string;
+        progress: number;
+      }
     | {
         status: "loadingBlockscout";
         searchTerm: string;
         pageUrl: string;
+        duneData: DuneData;
         progress: number;
       }
     | {
@@ -44,6 +76,7 @@ function Home() {
         searchTerm: string;
         pageUrl: string;
         blockscoutData: BlockscoutData;
+        duneData: DuneData;
         progress: number;
       }
     | {
@@ -51,6 +84,7 @@ function Home() {
         searchTerm: string;
         pageUrl: string;
         blockscoutData: BlockscoutData;
+        duneData: DuneData;
         score: number | null;
         progress: number;
       }
@@ -69,9 +103,10 @@ function Home() {
     const urlParams = new URLSearchParams(window.location.search);
     const storedTerm = urlParams.get("search");
     const storedUrl = urlParams.get("url");
+    console.log("storedTerm", storedTerm);
     if (storedTerm) {
       setState({
-        status: "loadingBlockscout",
+        status: "loadingDune",
         searchTerm: storedTerm,
         pageUrl: storedUrl || "",
         progress: 0,
@@ -82,6 +117,7 @@ function Home() {
   // Progress bar animation
   useEffect(() => {
     if (
+      state.status === "loadingDune" ||
       state.status === "loadingBlockscout" ||
       state.status === "loadingTalent"
     ) {
@@ -98,8 +134,34 @@ function Home() {
 
   // Handle state transitions
   useEffect(() => {
-    if (state.status === "loadingBlockscout") {
+    if (state.status === "loadingDune") {
       setProgress(10);
+      fetchDuneBalances(state.searchTerm)
+        .then((duneData) => {
+          const filteredBalances = duneData.balances.filter(
+            (b) => b.value_usd > MINIMUM_BALANCE_USD
+          );
+          setProgress(40);
+          setState({
+            status: "loadingBlockscout",
+            searchTerm: state.searchTerm,
+            pageUrl: state.pageUrl,
+            duneData: {
+              ...duneData,
+              balances: filteredBalances,
+            },
+            progress: 40,
+          });
+        })
+        .catch((err: any) => {
+          setState({
+            status: "error",
+            error: err.message || "Dune error",
+            progress: 100,
+          });
+        });
+    } else if (state.status === "loadingBlockscout") {
+      setProgress(50);
       fetchBlockscoutAddressInfo(state.searchTerm)
         .then((blockscoutData) => {
           setProgress(70);
@@ -117,6 +179,7 @@ function Home() {
               searchTerm: state.searchTerm,
               pageUrl: state.pageUrl,
               blockscoutData: blockscoutData,
+              duneData: state.duneData,
               progress: 70,
             });
           } else {
@@ -125,6 +188,7 @@ function Home() {
               searchTerm: state.searchTerm,
               pageUrl: state.pageUrl,
               blockscoutData: blockscoutData,
+              duneData: state.duneData,
               score: null,
               progress: 100,
             });
@@ -147,6 +211,7 @@ function Home() {
             searchTerm: state.searchTerm,
             pageUrl: state.pageUrl,
             blockscoutData: state.blockscoutData,
+            duneData: state.duneData,
             score,
             progress: 100,
           });
@@ -182,7 +247,7 @@ function Home() {
     e.preventDefault();
     if (!input.trim()) return;
     setState({
-      status: "loadingBlockscout",
+      status: "loadingDune",
       searchTerm: input.trim(),
       pageUrl: "",
       progress: 0,
@@ -215,7 +280,8 @@ function Home() {
           </button>
         </form>
       )}
-      {(state.status === "loadingBlockscout" ||
+      {(state.status === "loadingDune" ||
+        state.status === "loadingBlockscout" ||
         state.status === "loadingTalent" ||
         state.status === "done" ||
         state.status === "error") && (
@@ -233,7 +299,8 @@ function Home() {
               Page URL: <span className="text-primary">{state.pageUrl}</span>
             </p>
           )}
-          {(state.status === "loadingBlockscout" ||
+          {(state.status === "loadingDune" ||
+            state.status === "loadingBlockscout" ||
             state.status === "loadingTalent") && <Progress value={progress} />}
         </>
       )}
@@ -242,6 +309,32 @@ function Home() {
       )}
       {state.status === "done" && (
         <>
+          {/* Dune balances UI */}
+          {state.duneData && (
+            <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
+              <div className="font-bold text-lg text-center">Dune Balances</div>
+              <div>
+                Chains:{" "}
+                {state.duneData.balances
+                  .map((b) => b.chain)
+                  .filter((v, i, a) => a.indexOf(v) === i)
+                  .join(", ") || "-"}
+              </div>
+              <div className="mt-1">
+                {state.duneData.balances.length > 0 ? (
+                  <ul className="list-disc ml-4">
+                    {state.duneData.balances.map((b, i) => (
+                      <li key={i}>
+                        {b.chain}: {b.amount} {b.symbol}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span>No balances found.</span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
             <div className="font-bold text-lg text-center">Blockscout</div>
             {state.blockscoutData.name && (

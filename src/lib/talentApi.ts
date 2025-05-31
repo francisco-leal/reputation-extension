@@ -24,7 +24,7 @@ export async function fetchTalentScore(wallet: string): Promise<number | null> {
     },
   });
 
-  if (!res.ok) throw new Error("Failed to fetch score");
+  if (!res.ok) return 0;
   const data = await res.json();
   return data?.score?.points ?? null;
 }
