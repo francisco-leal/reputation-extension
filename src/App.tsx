@@ -16,6 +16,9 @@ import {
   NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
 import { Progress } from "@/components/ui/progress";
+import { fetchBlockscoutAddressInfo } from "@/lib/blockscoutApi";
+import { fetchTalentScore } from "@/lib/talentApi";
+import { parseUnits, formatEther } from "viem";
 
 function Home() {
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
@@ -25,12 +28,26 @@ function Home() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [showResult, setShowResult] = useState(false);
+  const [blockscoutData, setBlockscoutData] = useState<{
+    is_contract: boolean;
+    is_verified: boolean;
+    coin_balance: string;
+    name: string | null;
+  } | null>(null);
+  const [blockscoutError, setBlockscoutError] = useState<string | null>(null);
+  const [blockscoutLoading, setBlockscoutLoading] = useState(false);
 
   useEffect(() => {
     const storedTerm = window.localStorage.getItem("searchTerm");
-    if (storedTerm) setSearchTerm(storedTerm);
+    if (storedTerm) {
+      setSearchTerm(storedTerm);
+      window.localStorage.removeItem("searchTerm");
+    }
     const storedUrl = window.localStorage.getItem("pageUrl");
-    if (storedUrl) setPageUrl(storedUrl);
+    if (storedUrl) {
+      setPageUrl(storedUrl);
+      window.localStorage.removeItem("pageUrl");
+    }
 
     const onStorage = (e: StorageEvent) => {
       if (e.key === "searchTerm") setSearchTerm(e.newValue);
@@ -40,10 +57,10 @@ function Home() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Automatically fetch score when searchTerm is set
+  // Automatically fetch score and blockscout data when searchTerm is set
   useEffect(() => {
     if (searchTerm) {
-      handleSearchScore();
+      handleSearchData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
@@ -55,23 +72,34 @@ function Home() {
     return term;
   }
 
-  const handleSearchScore = async () => {
+  const handleSearchData = async () => {
     if (!searchTerm) return;
     setLoading(true);
+    setBlockscoutLoading(true);
     setError(null);
+    setBlockscoutError(null);
     setScore(null);
+    setBlockscoutData(null);
     setShowResult(false);
     setProgress(0);
     try {
-      const { fetchTalentScore } = await import("@/lib/talentApi");
-      const result = await fetchTalentScore(searchTerm);
-      setScore(result);
+      const [talentResult, blockscoutResult] = await Promise.all([
+        fetchTalentScore(searchTerm),
+        fetchBlockscoutAddressInfo(searchTerm),
+      ]);
+      setScore(talentResult);
+      setBlockscoutData(blockscoutResult);
     } catch (err: any) {
-      setError(err.message || "Unknown error");
+      if (err.message?.includes("Talent")) {
+        setError(err.message || "Unknown error");
+      } else {
+        setBlockscoutError(err.message || "Unknown error");
+      }
     } finally {
       setProgress(100);
       setTimeout(() => {
         setLoading(false);
+        setBlockscoutLoading(false);
         setShowResult(true);
       }, 300);
     }
@@ -104,7 +132,7 @@ function Home() {
               Page URL: <span className="text-primary">{pageUrl}</span>
             </p>
           )}
-          {loading && <Progress value={progress} />}
+          {loading || blockscoutLoading ? <Progress value={progress} /> : null}
         </>
       ) : (
         <p className="text-muted-foreground font-mono mb-2 text-center">
@@ -114,11 +142,47 @@ function Home() {
       {error && showResult && (
         <p className="text-red-500 font-mono mt-2">{error}</p>
       )}
-      {score !== null && showResult && !loading && !error && (
-        <p className="text-lg font-mono mt-2">
-          Builder Score: <b>{score}</b>
+      {blockscoutError !== null && showResult && (
+        <p className="text-red-500 font-mono mt-2">
+          Blockscout: {blockscoutError}
         </p>
       )}
+      {score !== null && showResult && !loading && !error && (
+        <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
+          <div className="font-bold text-lg text-center">Talent Protocol</div>
+          <div>
+            Builder Score: <b>{score}</b>
+          </div>
+        </div>
+      )}
+      {blockscoutData &&
+        showResult &&
+        !blockscoutLoading &&
+        !blockscoutError && (
+          <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
+            <div className="font-bold text-lg text-center">Blockscout</div>
+            {blockscoutData.name && (
+              <div>
+                Name: <b>{blockscoutData.name || "-"}</b>
+              </div>
+            )}
+            <div>
+              ETH Balance:{" "}
+              <b>
+                {Number(
+                  formatEther(parseUnits(blockscoutData.coin_balance, 0))
+                ).toFixed(2)}{" "}
+                ETH
+              </b>
+            </div>
+            <div>
+              Is Contract: <b>{blockscoutData.is_contract ? "Yes" : "No"}</b>
+            </div>
+            <div>
+              Is Verified: <b>{blockscoutData.is_verified ? "Yes" : "No"}</b>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
