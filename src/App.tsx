@@ -17,10 +17,11 @@ import {
 } from "@/components/ui/navigation-menu";
 import { Progress } from "@/components/ui/progress";
 import { fetchBlockscoutAddressInfo } from "@/lib/blockscoutApi";
-import { fetchTalentScore } from "@/lib/talentApi";
+import { fetchTalentScore, fetchTalentSocials } from "@/lib/talentApi";
 import { parseUnits, formatEther } from "viem";
 import { fetchDuneBalances } from "@/lib/duneApi";
 import { fetchFarcasterUser, type FarcasterUser } from "@/lib/farcasterApi";
+import type { TalentSocial } from "@/lib/talentApi";
 
 // Add BlockscoutData type
 type BlockscoutData = {
@@ -87,6 +88,7 @@ function Home() {
         blockscoutData: BlockscoutData;
         duneData: DuneData;
         score: number | null;
+        socials: TalentSocial[] | null;
         progress: number;
       }
     | { status: "error"; error: string; progress: number };
@@ -229,6 +231,7 @@ function Home() {
               blockscoutData: blockscoutData,
               duneData: state.duneData,
               score: null,
+              socials: null,
               progress: 100,
             });
           }
@@ -244,16 +247,33 @@ function Home() {
       setProgress(80);
       fetchTalentScore(state.searchTerm)
         .then((score) => {
-          setProgress(100);
-          setState({
-            status: "done",
-            searchTerm: state.searchTerm,
-            pageUrl: state.pageUrl,
-            blockscoutData: state.blockscoutData,
-            duneData: state.duneData,
-            score,
-            progress: 100,
-          });
+          setProgress(90);
+          fetchTalentSocials(state.searchTerm)
+            .then((socials) => {
+              setProgress(100);
+              setState({
+                status: "done",
+                searchTerm: state.searchTerm,
+                pageUrl: state.pageUrl,
+                blockscoutData: state.blockscoutData,
+                duneData: state.duneData,
+                score,
+                socials: socials?.filter((s) => s.source !== "efp") || null,
+                progress: 100,
+              });
+            })
+            .catch(() => {
+              setState({
+                status: "done",
+                searchTerm: state.searchTerm,
+                pageUrl: state.pageUrl,
+                blockscoutData: state.blockscoutData,
+                duneData: state.duneData,
+                score,
+                socials: null,
+                progress: 100,
+              });
+            });
         })
         .catch((err: any) => {
           setState({
@@ -419,6 +439,35 @@ function Home() {
               <div>
                 Builder Score: <b>{state.score}</b>
               </div>
+            </div>
+          )}
+          {/* Talent Socials UI */}
+          {state.socials && state.socials.length > 0 && (
+            <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
+              <div className="font-bold text-lg text-center mb-2">
+                Talent Socials
+              </div>
+              <ul className="list-disc ml-4">
+                {state.socials.map((s, i) => (
+                  <li key={i} className="mb-1">
+                    <span className="font-semibold">{s.source}:</span>{" "}
+                    {s.display_name || s.name || "-"}
+                    {s.profile_url && (
+                      <>
+                        {" "}
+                        <a
+                          href={s.profile_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline"
+                        >
+                          Profile
+                        </a>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
           {/* Farcaster UI */}
