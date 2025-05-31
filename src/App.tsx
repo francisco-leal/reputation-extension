@@ -33,6 +33,7 @@ function Home() {
     is_verified: boolean;
     coin_balance: string;
     name: string | null;
+    creator_address_hash: string | null;
   } | null>(null);
   const [blockscoutError, setBlockscoutError] = useState<string | null>(null);
   const [blockscoutLoading, setBlockscoutLoading] = useState(false);
@@ -178,6 +179,12 @@ function Home() {
             <div>
               Is Contract: <b>{blockscoutData.is_contract ? "Yes" : "No"}</b>
             </div>
+            {blockscoutData.creator_address_hash && (
+              <div>
+                Creator:{" "}
+                <b>{displaySearchTerm(blockscoutData.creator_address_hash)}</b>
+              </div>
+            )}
             <div>
               Is Verified: <b>{blockscoutData.is_verified ? "Yes" : "No"}</b>
             </div>

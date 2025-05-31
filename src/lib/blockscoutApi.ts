@@ -3,6 +3,7 @@ export async function fetchBlockscoutAddressInfo(wallet: string): Promise<{
   is_verified: boolean;
   coin_balance: string;
   name: string | null;
+  creator_address_hash: string | null;
 } | null> {
   const url = `https://eth.blockscout.com/api/v2/addresses/${encodeURIComponent(
     wallet
@@ -20,5 +21,6 @@ export async function fetchBlockscoutAddressInfo(wallet: string): Promise<{
     is_verified: data.is_verified,
     coin_balance: data.coin_balance,
     name: data.name,
+    creator_address_hash: data.creator_address_hash,
   };
 }
