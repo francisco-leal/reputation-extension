@@ -18,7 +18,6 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { fetchBlockscoutAddressInfo } from "@/lib/blockscoutApi";
 import { fetchTalentScore, fetchTalentSocials } from "@/lib/talentApi";
-import { parseUnits, formatEther } from "viem";
 import { fetchDuneBalances } from "@/lib/duneApi";
 import { fetchFarcasterUser, type FarcasterUser } from "@/lib/farcasterApi";
 import type { TalentSocial } from "@/lib/talentApi";
@@ -105,7 +104,6 @@ function Home() {
   const [farcasterUser, setFarcasterUser] = useState<FarcasterUser | null>(
     null
   );
-  const [farcasterLoading, setFarcasterLoading] = useState(false);
   const [farcasterError, setFarcasterError] = useState<string | null>(null);
 
   // Load from localStorage on mount
@@ -113,7 +111,6 @@ function Home() {
     const urlParams = new URLSearchParams(window.location.search);
     const storedTerm = urlParams.get("search");
     const storedUrl = urlParams.get("url");
-    console.log("storedTerm", storedTerm);
     if (storedTerm) {
       setState({
         status: "loadingDune",
@@ -146,8 +143,6 @@ function Home() {
   useEffect(() => {
     setFarcasterUser(null);
     setFarcasterError(null);
-    setFarcasterLoading(false);
-    console.log("test");
     if (
       "pageUrl" in state &&
       typeof state.pageUrl === "string" &&
@@ -156,18 +151,13 @@ function Home() {
       // Extract username: farcaster.xyz/USERNAME/
       const match = state.pageUrl.match(/farcaster\.xyz\/([^/]+)\//);
       const username = match && match[1] ? match[1] : null;
-      console.log("username", username);
-      console.log("state.pageUrl", state.pageUrl);
       if (username) {
-        setFarcasterLoading(true);
         fetchFarcasterUser(username)
           .then((user) => {
             setFarcasterUser(user);
-            setFarcasterLoading(false);
           })
           .catch((err) => {
             setFarcasterError(err.message || "Farcaster error");
-            setFarcasterLoading(false);
           });
       }
     }
@@ -367,138 +357,111 @@ function Home() {
         <p className="text-red-500 font-mono mt-2">{state.error}</p>
       )}
       {state.status === "done" && (
-        <>
-          {/* Dune balances UI */}
-          {state.duneData && (
-            <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
-              <div className="font-bold text-lg text-center">Dune Balances</div>
-              <div>
-                Chains:{" "}
-                {state.duneData.balances
-                  .map((b) => b.chain)
-                  .filter((v, i, a) => a.indexOf(v) === i)
-                  .join(", ") || "-"}
-              </div>
-              <div className="mt-1">
-                {state.duneData.balances.length > 0 ? (
-                  <ul className="list-disc ml-4">
-                    {state.duneData.balances.map((b, i) => (
-                      <li key={i}>
-                        {b.chain}: {b.amount} {b.symbol}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span>No balances found.</span>
-                )}
-              </div>
-            </div>
-          )}
-          <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
-            <div className="font-bold text-lg text-center">Blockscout</div>
-            {state.blockscoutData.name && (
-              <div>
-                Name: <b>{state.blockscoutData.name || "-"}</b>
-              </div>
-            )}
-            <div>
-              ETH Balance:{" "}
-              <b>
-                {typeof state.blockscoutData.coin_balance === "string"
-                  ? Number(
-                      formatEther(
-                        parseUnits(state.blockscoutData.coin_balance, 0)
-                      )
-                    ).toFixed(2)
-                  : "-"}{" "}
-                ETH
-              </b>
-            </div>
-            <div>
-              Is Contract:{" "}
-              <b>{state.blockscoutData.is_contract ? "Yes" : "No"}</b>
-            </div>
-            {state.blockscoutData.creator_address_hash && (
-              <div>
-                Creator:{" "}
-                <b>
-                  {displaySearchTerm(state.blockscoutData.creator_address_hash)}
-                </b>
-              </div>
-            )}
-            <div>
-              Is Verified:{" "}
-              <b>{state.blockscoutData.is_verified ? "Yes" : "No"}</b>
-            </div>
-          </div>
-          {state.score !== null && (
-            <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
-              <div className="font-bold text-lg text-center">
-                Talent Protocol
-              </div>
-              <div>
-                Builder Score: <b>{state.score}</b>
-              </div>
-            </div>
-          )}
-          {/* Talent Socials UI */}
-          {state.socials && state.socials.length > 0 && (
-            <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
-              <div className="font-bold text-lg text-center mb-2">
-                Talent Socials
-              </div>
-              <ul className="list-disc ml-4">
-                {state.socials.map((s, i) => (
-                  <li key={i} className="mb-1">
-                    <span className="font-semibold">{s.source}:</span>{" "}
-                    {s.display_name || s.name || "-"}
-                    {s.profile_url && (
-                      <>
-                        {" "}
-                        <a
-                          href={s.profile_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary underline"
-                        >
-                          Profile
-                        </a>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+        <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
           {/* Farcaster UI */}
           {"pageUrl" in state &&
             typeof state.pageUrl === "string" &&
             state.pageUrl.includes("farcaster.xyz") && (
-              <div className="text-sm font-mono mt-2 p-2 border rounded bg-muted">
-                <div className="font-bold text-lg text-center">Farcaster</div>
-                {farcasterLoading && <div>Loading Farcaster user...</div>}
+              <>
                 {farcasterError && (
                   <div className="text-red-500">{farcasterError}</div>
                 )}
                 {farcasterUser && (
-                  <div className="flex flex-col items-center gap-2">
-                    <img
-                      src={farcasterUser.pfp_url}
-                      alt="Profile"
-                      className="w-12 h-12 rounded-full border"
-                    />
-                    <div>
-                      <b>
-                        {farcasterUser.display_name || farcasterUser.username}
-                      </b>
+                  <div className="flex flex-col gap-2 items-center">
+                    <div className="flex flex-row gap-2 items-center">
+                      <img
+                        src={farcasterUser.pfp_url}
+                        alt="Profile"
+                        className="w-12 h-12 rounded-full border"
+                      />
+                      <div>
+                        <b>
+                          {farcasterUser.display_name || farcasterUser.username}
+                        </b>
+                      </div>
                     </div>
-                    <div>FID: {farcasterUser.fid}</div>
-                    <div>Followers: {farcasterUser.follower_count}</div>
                   </div>
                 )}
-              </div>
+              </>
             )}
-        </>
+
+          {state.score !== null && (
+            <div className="text-center mt-2">
+              Builder Score: <b>{state.score}</b>
+            </div>
+          )}
+          {/* Dune balances UI */}
+          {state.duneData && (
+            <>
+              <div className="font-bold text-center mt-2">Active chains</div>
+              <div className="flex flex-wrap gap-2 mt-1 justify-center">
+                {/* Show only active chains as badges */}
+                {Array.from(
+                  new Set(
+                    state.duneData.balances
+                      .filter((b) => Number(b.amount) > 0)
+                      .map((b) => b.chain)
+                  )
+                ).map((chain, i) => (
+                  <div
+                    className="bg-gray-200 text-black px-2 py-1 border rounded-full"
+                    key={i}
+                  >
+                    {chain}
+                  </div>
+                ))}
+                {state.duneData.balances.filter((b) => Number(b.amount) > 0)
+                  .length === 0 && <span>No active chains found.</span>}
+              </div>
+            </>
+          )}
+          {state.blockscoutData.name && (
+            <div className="text-center mt-2">
+              Name: <b>{state.blockscoutData.name || "-"}</b>
+            </div>
+          )}
+          {state.blockscoutData.is_contract && (
+            <div className="text-center mt-2">
+              Contract: <b>Yes</b>
+            </div>
+          )}
+          {state.blockscoutData.creator_address_hash && (
+            <div className="text-center mt-2">
+              Creator:{" "}
+              <b>
+                {displaySearchTerm(state.blockscoutData.creator_address_hash)}
+              </b>
+            </div>
+          )}
+          {state.blockscoutData.is_verified && (
+            <div className="text-center mt-2">
+              Verified: <b>Yes</b>
+            </div>
+          )}
+          {/* Talent Socials UI */}
+          {state.socials && state.socials.length > 0 && (
+            <>
+              <div className="font-bold text-center mt-2">
+                Active social accounts
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {state.socials.map((s, i) =>
+                  s.profile_url ? (
+                    <a
+                      key={i}
+                      href={s.profile_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-gray-200 text-black px-2 py-1 border rounded-full"
+                    >
+                      {s.source}
+                    </a>
+                  ) : null
+                )}
+              </div>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
